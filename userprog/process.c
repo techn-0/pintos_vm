@@ -108,14 +108,16 @@ duplicate_pte(uint64_t *pte, void *va, void *aux)
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page(parent->pml4, va);
-	if (parent_page == NULL) {
+	if (parent_page == NULL)
+	{
 		return false;
 	}
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
 	newpage = palloc_get_page(PAL_USER);
-	if (newpage == NULL) {
+	if (newpage == NULL)
+	{
 		return false;
 	}
 
@@ -130,8 +132,13 @@ duplicate_pte(uint64_t *pte, void *va, void *aux)
 	if (!pml4_set_page(current->pml4, va, newpage, writable))
 	{
 		/* 6. TODO: if fail to insert page, do error handling. */
+		uint64_t *pml4;
+		pml4 = current->pml4;
+		current->pml4 = NULL;
+		pml4_activate(NULL);
+		pml4_destroy(pml4);
+		
 		palloc_free_page(newpage);
-		pml4_destroy(current->pml4);
 		return false;
 	}
 immeReturn:
@@ -309,8 +316,10 @@ void process_exit(void)
 		thread_unblock(curr->parent);
 	}
 	//	열린 파일 정리
-	for (int i = 0; i < FD_MAX; i++) {
-		if (curr->descriptors[i] != NULL) {
+	for (int i = 0; i < FD_MAX; i++)
+	{
+		if (curr->descriptors[i] != NULL)
+		{
 			file_close(curr->descriptors[i]);
 		}
 	}
