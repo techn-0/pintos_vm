@@ -1,0 +1,26 @@
+{
+    "files.associations": {
+        "intr-stubs.h": "c",
+        "list.h": "c",
+        "bitmap.h": "c",
+        "stdlib.h": "c",
+        "palloc.h": "c",
+        "tests.h": "c",
+        "file.h": "c",
+        "*.inc": "c",
+        "syscall-nr.h": "c",
+        "stdint.h": "c",
+        "syscall.h": "c",
+        "filesys.h": "c",
+        "inode.h": "c",
+        "off_t.h": "c",
+        "disk.h": "c",
+        "synch.h": "c",
+        "process.h": "c",
+        "interrupt.h": "c",
+        "debug.h": "c",
+        "syn-write.h": "c",
+        "lib.h": "c",
+        "thread.h": "c"
+    }
+}
