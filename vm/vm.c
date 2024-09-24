@@ -213,15 +213,43 @@ void supplemental_page_table_kill(struct supplemental_page_table *spt UNUSED)
 }
 
 // 휘건 추가
+
+// 가상 주소를 hashed index로 변환하는 함수
 unsigned page_hash(const struct hash_elem *p_, void *aux UNUSED)
 {
 	const struct page *p = hash_entry(p_, struct page, hash_elem);
+	// 주어진 해시 테이블 요소 p_를 page 구조체로 변환 (p_는 page의 hash_elem 필드를 가리킴)
 	return hash_bytes(&p->va, sizeof(p->va));
+	// 페이지의 가상 주소(va)를 바이트 단위 해싱하여, 해당 주소를 기반으로 해시 값을 반환
 }
 
+// 해시 테이블 내 두 페이지 요소에 대해 주소값을 비교하는 함수
+static unsigned less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux)
+{
+	// 해시 테이블 요소 a와 b를 struct page 구조체로 변환
+	const struct page *p_a = hash_entry(a, struct page, hash_elem);
+	const struct page *p_b = hash_entry(b, struct page, hash_elem);
+	return p_a->va < p_b->va;
+	// p_a의 가상 주소(va)가 p_b의 가상 주소보다 작은 경우 true
+}
+
+// 페이지에 들어있는 hash_elem 구조체를 인지로 받은 해시 테이블에 삽입하는 함수
 bool page_insert(struct hash *h, struct page *p)
 {
 	if (!hash_insert(h, &p->hash_elem))
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+// 헤시테이블에서 삭제한다
+bool page_delete(struct hash *h, struct page *p)
+{
+	if (!hash_delete(h, &p->hash_elem))
 	{
 		return true;
 	}
