@@ -48,6 +48,7 @@ static unsigned less_func(const struct hash_elem *a, const struct hash_elem *b, 
 bool page_insert(struct hash *h, struct page *p);
 bool page_delete(struct hash *h, struct page *p);
 struct list frame_table;
+static struct frame *vm_get_frame(void);
 
 /* Create the pending page object with initializer. If you want to create a
  * page, do not create it directly and make it through this function or
@@ -95,7 +96,7 @@ spt_find_page(struct supplemental_page_table *spt UNUSED, void *va UNUSED)
 
 	return e != NULL ? hash_entry(e, struct page, hash_elem) : NULL;
 	// 찾은 해시 요소가 NULL이 아닐 경우, 해당 해시 요소에 대한 페이지 구조체 포인터를 반환
-	// NULL일 경우 NULL을 반환한다.
+	// NULL일 경우 NULL반환
 }
 
 /* Insert PAGE into spt with validation. */
@@ -134,7 +135,8 @@ vm_evict_frame(void)
 {
 	struct frame *victim UNUSED = vm_get_victim();
 	/* TODO: swap out the victim and return the evicted frame. */
-
+	// 휘건 추가
+	swap_out(victim->page); // 프레임과 연결된 페이지를 스왑 디스크로 내보냄
 	return NULL;
 }
 
@@ -145,11 +147,29 @@ vm_evict_frame(void)
 static struct frame *
 vm_get_frame(void)
 {
-	struct frame *frame = NULL;
-	/* TODO: Fill this function. */
+	// struct frame *frame = NULL;
+	// /* TODO: Fill this function. */
 
-	ASSERT(frame != NULL);
-	ASSERT(frame->page == NULL);
+	// ASSERT(frame != NULL);
+	// ASSERT(frame->page == NULL);
+	// return frame;
+
+	// 휘건 추가
+	// 새로운 프레임 구조체 메모리 할당
+	struct frame *frame = (struct frame *)malloc(sizeof(struct frame));
+	ASSERT(frame != NULL);					// 프레임 할당이 제대로 되었는지 확인 (NULL인지 아닌지)
+	ASSERT(frame->page == NULL);			// 새로운 프레임이 할당되었을 때, 페이지가 연결되어 있지 않아야 함
+	frame->kva = palloc_get_page(PAL_USER); // 커널 가상 주소에 해당하는 페이지 할당 시도
+	if (frame->kva == NULL)
+	{
+		// 페이지 할당에 실패하면 프레임을 교체하는 eviction 수행
+		frame = vm_evict_frame();
+		frame->page = NULL;
+		return frame;
+	}
+	// 프레임 테이블에 새로 할당된 프레임을 추가
+	list_push_back(&frame_table, &frame->frame_elem);
+	frame->page = NULL; // 아직 페이지와 연결되지 않았다 표시
 	return frame;
 }
 
