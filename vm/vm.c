@@ -3,6 +3,9 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
+// 휘건 추가
+#include "threads/vaddr.h"
+#define pg_round_down(va) (void *)((uint64_t)(va) & ~PGMASK)
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -39,6 +42,13 @@ static struct frame *vm_get_victim(void);
 static bool vm_do_claim_page(struct page *page);
 static struct frame *vm_evict_frame(void);
 
+// 휘건 추가
+unsigned page_hash(const struct hash_elem *p_, void *aux UNUSED);
+static unsigned less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux);
+bool page_insert(struct hash *h, struct page *p);
+bool page_delete(struct hash *h, struct page *p);
+struct list frame_table;
+
 /* Create the pending page object with initializer. If you want to create a
  * page, do not create it directly and make it through this function or
  * `vm_alloc_page`. */
@@ -71,26 +81,34 @@ spt_find_page(struct supplemental_page_table *spt UNUSED, void *va UNUSED)
 	// /* TODO: Fill this function. */
 
 	// return page;
-	struct page *page = (struct page *)malloc(sizeof(struct page));
-	struct hash_elem *e;
 
+	// 현재 페이지 구조체의 포인터를 정의
+	struct page *page = (struct page *)malloc(sizeof(struct page));
+	struct hash_elem *e; // 해시 요소를 저장할 포인터를 정의
+
+	// 주어진 가상 주소 va를 페이지 경계로 내림(round down)하여 페이지 구조체의 가상 주소 필드에 저장
 	page->va = pg_round_down(va);
 
+	// 페이지 테이블의 해시 테이블에서 해당 가상 주소에 대한 페이지 팀색
 	e = hash_find(&spt->spt_hash, &page->hash_elem);
-	free(page);
+	free(page); // 페이지 구조체는 더 이상 필요 없으므로 메모리를 해제
 
-	return e != NULL ? hash_entry(e, struct page, hash_elem): NULL;
+	return e != NULL ? hash_entry(e, struct page, hash_elem) : NULL;
+	// 찾은 해시 요소가 NULL이 아닐 경우, 해당 해시 요소에 대한 페이지 구조체 포인터를 반환
+	// NULL일 경우 NULL을 반환한다.
 }
 
 /* Insert PAGE into spt with validation. */
 bool spt_insert_page(struct supplemental_page_table *spt UNUSED,
 					 struct page *page UNUSED)
 {
+	// 페이지를 삽입 성공 여부를 저장할 변수
 	// int succ = false;
 	// /* TODO: Fill this function. */
 
 	// return succ;
 	return page_insert(&spt->spt_hash, page);
+	// 주어진 페이지를 spt 페이지 테이블의 해시 테이블에 삽입, 결과를 반환
 }
 
 void spt_remove_page(struct supplemental_page_table *spt, struct page *page)

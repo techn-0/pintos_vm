@@ -66,6 +66,8 @@ struct page {
 struct frame {
 	void *kva;
 	struct page *page;
+	// 휘건 추가
+	struct list_elem frame_elem;
 };
 
 /* The function table for page operations.
