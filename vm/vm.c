@@ -67,20 +67,30 @@ err:
 struct page *
 spt_find_page(struct supplemental_page_table *spt UNUSED, void *va UNUSED)
 {
-	struct page *page = NULL;
-	/* TODO: Fill this function. */
+	// struct page *page = NULL;
+	// /* TODO: Fill this function. */
 
-	return page;
+	// return page;
+	struct page *page = (struct page *)malloc(sizeof(struct page));
+	struct hash_elem *e;
+
+	page->va = pg_round_down(va);
+
+	e = hash_find(&spt->spt_hash, &page->hash_elem);
+	free(page);
+
+	return e != NULL ? hash_entry(e, struct page, hash_elem): NULL;
 }
 
 /* Insert PAGE into spt with validation. */
 bool spt_insert_page(struct supplemental_page_table *spt UNUSED,
 					 struct page *page UNUSED)
 {
-	int succ = false;
-	/* TODO: Fill this function. */
+	// int succ = false;
+	// /* TODO: Fill this function. */
 
-	return succ;
+	// return succ;
+	return page_insert(&spt->spt_hash, page);
 }
 
 void spt_remove_page(struct supplemental_page_table *spt, struct page *page)
@@ -195,8 +205,10 @@ bool page_less(const struct hash_elem *a_,
 void supplemental_page_table_init(struct supplemental_page_table *spt UNUSED)
 {
 	//	준용 추가
-	hash_init(&spt->table, hash_bytes, page_less, NULL);
+	// hash_init(&spt->table, hash_bytes, page_less, NULL);
 	lock_init(&spt->sptLock);
+	// 휘건 추가
+	hash_init(&spt->spt_hash, page_hash, page_less, NULL);
 }
 
 /* Copy supplemental page table from src to dst */
@@ -226,35 +238,39 @@ unsigned page_hash(const struct hash_elem *p_, void *aux UNUSED)
 // 해시 테이블 내 두 페이지 요소에 대해 주소값을 비교하는 함수
 static unsigned less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux)
 {
-	// 해시 테이블 요소 a와 b를 struct page 구조체로 변환
+	// 해시 테이블 요소 a와 b를 page 구조체로 변환
 	const struct page *p_a = hash_entry(a, struct page, hash_elem);
 	const struct page *p_b = hash_entry(b, struct page, hash_elem);
 	return p_a->va < p_b->va;
 	// p_a의 가상 주소(va)가 p_b의 가상 주소보다 작은 경우 true
+
+	// aux는 추가적인 데이터를 전달할 수 있지만 사용되지 않음
 }
 
 // 페이지에 들어있는 hash_elem 구조체를 인지로 받은 해시 테이블에 삽입하는 함수
 bool page_insert(struct hash *h, struct page *p)
 {
+	// 페이지의 hash_elem을 해시 테이블 h에 삽입
 	if (!hash_insert(h, &p->hash_elem))
 	{
-		return true;
+		return true; // 삽입 성공시 NULL을 반환하므로 true
 	}
 	else
 	{
-		return false;
+		return false; // 이미 존재하는 경우 hash_insert가 삽입하지 않으므로 false
 	}
 }
 
-// 헤시테이블에서 삭제한다
+// 페이지에 들어있는 hash_elem 구조체를 해시 테이블에서 삭제하는 함수
 bool page_delete(struct hash *h, struct page *p)
 {
+	// 페이지의 hash_elem을 해시 테이블 h에서 삭제
 	if (!hash_delete(h, &p->hash_elem))
 	{
-		return true;
+		return true; // 삭제 성공시 NULL이 아닌 값이 반환되므로 true
 	}
 	else
 	{
-		return false;
+		return false; // 삭제할 요소가 없으면 hash_delete가 NULL을 반환하므로 false
 	}
 }

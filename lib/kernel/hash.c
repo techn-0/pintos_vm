@@ -23,9 +23,9 @@ static void rehash(struct hash *);
    compare hash elements using LESS, given auxiliary data AUX. */
 bool hash_init(struct hash *h,
 			   hash_hash_func *hash, hash_less_func *less, void *aux)
-			   // hash_hash_func : hashed index를 만드는 함수
-			   // hash_less_func : hash 요소 간에 비교 함수
-			   // 이 두개 함수를 구현해야함
+// hash_hash_func : hashed index를 만드는 함수
+// hash_less_func : hash 요소 간에 비교 함수
+// 이 두개 함수를 구현해야함
 {
 	h->elem_cnt = 0;
 	h->bucket_cnt = 4; // 0 1 2 3
