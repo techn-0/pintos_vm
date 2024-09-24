@@ -91,6 +91,8 @@ struct supplemental_page_table {
 	//	준용 추가
 	struct hash table;
 	struct lock sptLock;
+	// 휘건 추가
+	struct hash spt_hash;
 };
 
 #include "threads/thread.h"

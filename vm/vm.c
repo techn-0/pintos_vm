@@ -211,3 +211,22 @@ void supplemental_page_table_kill(struct supplemental_page_table *spt UNUSED)
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
 }
+
+// 휘건 추가
+unsigned page_hash(const struct hash_elem *p_, void *aux UNUSED)
+{
+	const struct page *p = hash_entry(p_, struct page, hash_elem);
+	return hash_bytes(&p->va, sizeof(p->va));
+}
+
+bool page_insert(struct hash *h, struct page *p)
+{
+	if (!hash_insert(h, &p->hash_elem))
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}

@@ -25,6 +25,11 @@
 #include <stdint.h>
 #include "list.h"
 
+#define hash_entry(HASH_ELEM, STRUCT, MEMBER)                   \
+	((STRUCT *) ((uint8_t *) &(HASH_ELEM)->list_elem - offsetof (STRUCT, MEMBER.list_elem)))
+
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *) 0)->MEMBER)
+
 /* Hash element. */
 struct hash_elem {
 	struct list_elem list_elem;
