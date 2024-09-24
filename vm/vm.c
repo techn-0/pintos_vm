@@ -125,6 +125,37 @@ vm_get_victim(void)
 	struct frame *victim = NULL;
 	/* TODO: The policy for eviction is up to you. */
 
+	// 휘건 추가
+	struct thread *curr = thread_current(); // 현재 스레드의 pml4
+	struct list_elem *e, *start;
+
+	// 첫 번째 루프: 현재 위치에서 끝까지 검사
+	for (start = e; start != list_end(&frame_table); list_next(start))
+	{
+		victim = list_entry(start, struct frame, frame_elem); // 현재 리스트 요소를 frame으로 변환
+		if (pml4_is_accessed(curr->pml4, victim->page->va))	  // 현재 페이지가 최근에 접근된 적이 있는지 확인
+		{
+			pml4_set_accessed(curr->pml4, victim->page->va, 0); // 접근된 페이지는 accessed bit를 0으로 초기화
+		}
+		else
+		{
+			return victim; // accessed bit가 0인 페이지를 찾으면 바로 그 프레임을 반환
+		}
+	}
+
+	// 두 번째 루프: 리스트의 처음부터 다시 현재 위치까지 검사
+	for (start = list_begin(&frame_table); start != e; start = list_next(start))
+	{
+		victim = list_entry(start, struct frame, frame_elem);
+		if (pml4_is_accessed(curr->pml4, victim->page->va))
+		{
+			pml4_set_accessed(curr->pml4, victim->page->va, 0);
+		}
+		else
+		{
+			return victim;
+		}
+	}
 	return victim;
 }
 
