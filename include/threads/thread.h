@@ -11,6 +11,8 @@
 #endif
 #define USERPROG
 
+// 휘건 추가
+//  #define VM
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -99,7 +101,7 @@ struct thread
 	enum thread_status status; /* Thread state. */
 	char name[16];			   /* Name (for debugging purposes). */
 	int priority;			   /* Priority. */
-	int originalPriority;		/* initial 시에 최초로 초기화된 우선순위 */
+	int originalPriority;	   /* initial 시에 최초로 초기화된 우선순위 */
 
 	/* Shared between thread.c and synch.c. */
 	//	링크드 리스트의 노드가 되기 위한 list_elem 구조체
@@ -118,6 +120,8 @@ struct thread
 	//	allList 에 포함되기 위해 사용되는 elem
 	struct list_elem allElem;
 
+	// 휘건 추가
+	// void *stack_bottom;
 #ifdef USERPROG
 	//	준용추가
 	//	나중에 다 하고 아래 ifdef 로 내려줘야 함
@@ -134,16 +138,19 @@ struct thread
 	//	for write deny
 	struct file *execFile;
 	uint64_t *pml4; /* Page map level 4 */
-	/* Owned by userprog/process.c. */
+					/* Owned by userprog/process.c. */
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
+	// 휘건 추가
+	void *stack_bottom;
+	void *rsp_stack;
 #endif
 
-	/* Owned by thread.c. */
-	struct intr_frame tf; /* Information for switching */
-	unsigned magic;		  /* Detects stack overflow. */
+				   /* Owned by thread.c. */
+				   struct intr_frame tf; /* Information for switching */
+	unsigned magic;						 /* Detects stack overflow. */
 };
 
 /* If false (default), use round-robin scheduler.

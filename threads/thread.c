@@ -514,7 +514,8 @@ void thread_exit(void)
 	{
 		struct thread *ch = list_entry(list_pop_front(&curr->childs), struct thread, pgElem);
 		ch->parent = NULL;
-		if (ch->status == THREAD_DYING) {
+		if (ch->status == THREAD_DYING)
+		{
 			palloc_free_page(ch);
 		}
 	}
@@ -669,6 +670,9 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->priority = priority;
 	//	준용 추가, 0번 1번은 std in / out
 	t->nextDescriptor = 2;
+	// 휘건 추가
+	t->stack_bottom = (uint8_t *)t;
+
 	//	for wait
 	t->wakeUpParent = false;
 	t->exitStatus = KERN_EXIT;
@@ -679,12 +683,14 @@ init_thread(struct thread *t, const char *name, int priority)
 		//	아니요
 		t->parent = thread_current();
 		list_push_back(&t->parent->childs, &t->pgElem);
-	} else {
+	}
+	else
+	{
 		//	네
 		t->parent = NULL;
 	}
 	list_init(&t->childs);
-	
+
 	for (int i = t->nextDescriptor; i < FD_MAX; i++)
 	{
 		t->descriptors[i] = NULL;
@@ -907,7 +913,8 @@ schedule(void)
 				list_remove(&curr->allElem);
 			}
 			// 준용 변경 - 부모가 없으면 그냥 종료 (init thread 거나, 부모가 먼저 종료된 경우)
-			if (curr->parent == NULL) {
+			if (curr->parent == NULL)
+			{
 				list_push_back(&destruction_req, &curr->elem);
 			}
 		}

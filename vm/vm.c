@@ -5,7 +5,23 @@
 #include "vm/inspect.h"
 // 휘건 추가
 #include "threads/vaddr.h"
+#include "threads/thread.h"
+#include "vm/uninit.h"
+
 #define pg_round_down(va) (void *)((uint64_t)(va) & ~PGMASK)
+// 보류
+static bool
+install_page(void *upage, void *kpage, bool writable);
+
+// 휘건 추가
+unsigned page_hash(const struct hash_elem *p_, void *aux UNUSED);
+static unsigned less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux);
+bool page_insert(struct hash *h, struct page *p);
+bool page_delete(struct hash *h, struct page *p);
+struct list frame_table;
+static struct frame *vm_get_frame(void);
+
+// #include "userprog/process.c"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -19,6 +35,10 @@ void vm_init(void)
 	register_inspect_intr();
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
+	// 휘건 추가
+	list_init(&frame_table);
+	// 보류
+	struct list_elem *start = list_begin(&frame_table);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -42,14 +62,6 @@ static struct frame *vm_get_victim(void);
 static bool vm_do_claim_page(struct page *page);
 static struct frame *vm_evict_frame(void);
 
-// 휘건 추가
-unsigned page_hash(const struct hash_elem *p_, void *aux UNUSED);
-static unsigned less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux);
-bool page_insert(struct hash *h, struct page *p);
-bool page_delete(struct hash *h, struct page *p);
-struct list frame_table;
-static struct frame *vm_get_frame(void);
-
 /* Create the pending page object with initializer. If you want to create a
  * page, do not create it directly and make it through this function or
  * `vm_alloc_page`. */
@@ -69,6 +81,25 @@ bool vm_alloc_page_with_initializer(enum vm_type type, void *upage, bool writabl
 		 * TODO: should modify the field after calling the uninit_new. */
 
 		/* TODO: Insert the page into the spt. */
+
+		// 휘건 추가
+		struct page *page = (struct page *)malloc(sizeof(struct page));
+		typedef bool (*initializerFunc)(struct page *, enum vm_type, void *);
+		initializerFunc initializer = NULL;
+
+		switch (VM_TYPE(type))
+		{
+		case VM_ANON:
+			initializer = anon_initializer;
+			break;
+		case VM_FILE:
+			initializer = file_backed_initializer;
+			break;
+		}
+		uninit_new(page, upage, init, type, aux, initializer);
+
+		page->writable = writable;
+		return spt_insert_page(spt, page);
 	}
 err:
 	return false;
@@ -208,6 +239,13 @@ vm_get_frame(void)
 static void
 vm_stack_growth(void *addr UNUSED)
 {
+	// 휘건 추가
+	if (vm_alloc_page(VM_ANON | VM_MARKER_0, addr, 1))
+	{
+		vm_claim_page(addr);
+		thread_current()->stack_bottom -= PGSIZE;
+	}
+	
 }
 
 /* Handle the fault on write_protected page */
@@ -224,8 +262,28 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
+	if (is_kernel_vaddr(addr))
+	{
+		return false;
+	}
+	void *rsp_stack = is_kernel_vaddr(f->rsp) ? thread_current()->rsp_stack : f->rsp;
 
-	return vm_do_claim_page(page);
+	if (not_present)
+	{
+		if (!vm_claim_page(addr))
+		{
+			if (rsp_stack - 8 <= addr && USER_STACK - 0x100000 <= addr && addr <= USER_STACK)
+			{
+				vm_stack_growth(thread_current()->stack_bottom - PGSIZE);
+				return true;
+			}
+			return false;
+		}
+		else
+			return true;
+	}
+	return false;
+	// return vm_do_claim_page(page);
 }
 
 /* Free the page.
@@ -242,6 +300,13 @@ bool vm_claim_page(void *va UNUSED)
 	struct page *page = NULL;
 	/* TODO: Fill this function */
 
+	// 휘건 추가
+	page = spt_find_page(&thread_current()->spt, va);
+	if (page == NULL)
+	{
+		return false;
+	}
+
 	return vm_do_claim_page(page);
 }
 
@@ -257,7 +322,14 @@ vm_do_claim_page(struct page *page)
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 
-	return swap_in(page, frame->kva);
+	// 휘건 추가
+	if (install_page(page->va, frame->kva, page->writable))
+	{
+		return swap_in(page, frame->kva);
+	}
+	return false;
+
+	// return swap_in(page, frame->kva);
 }
 
 //	준용 추가
@@ -342,4 +414,15 @@ bool page_delete(struct hash *h, struct page *p)
 	{
 		return false; // 삭제할 요소가 없으면 hash_delete가 NULL을 반환하므로 false
 	}
+}
+
+// 휘건 추가 보류
+static bool
+install_page(void *upage, void *kpage, bool writable)
+{
+	struct thread *t = thread_current();
+
+	/* Verify that there's not already a page at that virtual
+	 * address, then map our page there. */
+	return (pml4_get_page(t->pml4, upage) == NULL && pml4_set_page(t->pml4, upage, kpage, writable));
 }

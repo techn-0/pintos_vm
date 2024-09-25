@@ -51,6 +51,8 @@ struct page
 
 	/* Your implementation 즉, 준용 추가*/
 	struct hash_elem hash_elem;
+	// 휘건 추가
+	bool writable;
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
