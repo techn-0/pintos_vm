@@ -98,7 +98,8 @@ tid_t fork(const char *thread_name, struct intr_frame *frame)
 	enum intr_level old_intr = intr_disable();
 	thread_block();
 	intr_set_level(old_intr);
-	if (frame->R.rax == TID_ERROR) {
+	if (frame->R.rax == TID_ERROR)
+	{
 		return TID_ERROR;
 	}
 	return returnPid;
@@ -263,6 +264,12 @@ tid_t wait(tid_t pid)
 void syscall_handler(struct intr_frame *f)
 {
 	// TODO: Your implementation goes here.
+	// 휘건 추가
+	int syscall_n = f->R.rax;
+#ifdef VM
+	thread_current()->rsp = f->rsp; // 추가
+#endif
+
 	//	systemcall 번호 - rax
 	//	인자 - rdi, rsi, rdx, r10, r8, r9
 	switch (f->R.rax)

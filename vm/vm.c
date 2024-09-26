@@ -4,7 +4,12 @@
 #include "vm/vm.h"
 #include "vm/inspect.h"
 
+#include "threads/thread.h"
+#include "threads/mmu.h"
+#include "userprog/process.h"
+
 // 휘건 추가
+#include "threads/vaddr.h"
 unsigned
 page_hash(const struct hash_elem *p_, void *aux UNUSED);
 bool page_less(const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
@@ -100,13 +105,13 @@ spt_find_page(struct supplemental_page_table *spt UNUSED, void *va UNUSED)
 	/* TODO: Fill this function. */
 
 	// 휘건 추가
-	page = malloc(sizeof(struct page));
+	page = (struct page *)malloc(sizeof(struct page));
 	struct hash_elem *e;
 
 	// va에 해당하는 hash_elem 탐색
-	page->va = va;
-	e = hash_find(&spt, &page->hash_elem);
-
+	page->va = pg_round_down(va); // page의 시작 주소 할당
+	e = hash_find(&spt->spt_hash, &page->hash_elem);
+	free(page);
 	// 찾으면 e에 해당하는 페이지 리턴
 	return e != NULL ? hash_entry(e, struct page, hash_elem) : NULL;
 	// return page;
@@ -119,7 +124,7 @@ bool spt_insert_page(struct supplemental_page_table *spt UNUSED,
 	// int succ = false;
 	/* TODO: Fill this function. */
 	// 휘건 추가
-	return hash_insert(&spt, &page->hash_elem) == NULL ? true : false;
+	return hash_insert(&spt->spt_hash, &page->hash_elem) == NULL ? true : false;
 	// 존재하지 않을 경우만 삽입
 
 	// return succ;
@@ -127,6 +132,9 @@ bool spt_insert_page(struct supplemental_page_table *spt UNUSED,
 
 void spt_remove_page(struct supplemental_page_table *spt, struct page *page)
 {
+	// 휘건 추가
+	hash_delete(&spt->spt_hash, &page->hash_elem);
+
 	vm_dealloc_page(page);
 	return true;
 }
@@ -167,11 +175,17 @@ vm_get_frame(void)
 
 	if (kva == NULL) // 페이지 할당 실패 시
 	{
-		PANIC("todo"); // OS 중지, 에러 정보 출력
+		struct frame *victim = vm_evict_frame();
+		victim->page = NULL;
+		return victim;
 	}
-	frame = malloc(sizeof(struct frame)); // 프레임 할당
-	frame->kva = kva;					  // 프레임의 kva(멤버) 초기화
+	frame = (struct frame *)malloc(sizeof(struct frame)); // 프레임 할당
+	frame->kva = kva;									  // 프레임의 kva(멤버) 초기화
+	frame->page = NULL;
 
+	// lock_acquire(&frame_table_lock);
+	// list_push_back(&frame_table, &frame->frame_elem);
+	// lock_release(&frame_table_lock);
 	ASSERT(frame != NULL);
 	ASSERT(frame->page == NULL);
 	return frame;
@@ -181,6 +195,8 @@ vm_get_frame(void)
 static void
 vm_stack_growth(void *addr UNUSED)
 {
+	// 휘건 추가
+	vm_alloc_page(VM_ANON | VM_MARKER_0, pg_round_down(addr), 1);
 }
 
 /* Handle the fault on write_protected page */
@@ -197,8 +213,41 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
+	// 휘건 추가
+	if (addr == NULL)
+		return false;
 
-	return vm_do_claim_page(page);
+	if (is_kernel_vaddr(addr))
+		return false;
+
+	if (not_present) // 접근한 메모리의 physical page가 존재하지 않은 경우
+	{
+		void *rsp = f->rsp;
+		/* TODO: Validate the fault */
+		// 	page = spt_find_page(spt, addr);
+		// 	if (page == NULL)
+		// 		return false;
+		// 	if (write == 1 && page->writable == 0) // write 불가능한 페이지에 write 요청한 경우
+		// 		return false;
+		// 	return vm_do_claim_page(page);
+		// }
+		// return false;
+		if (!user) // kernel access인 경우 thread에서 rsp를 가져와야 한다.
+			rsp = thread_current()->rsp;
+
+		// 스택 확장으로 처리할 수 있는 폴트인 경우, vm_stack_growth를 호출
+		if ((USER_STACK - (1 << 20) <= rsp - 8 && rsp - 8 == addr && addr <= USER_STACK) || (USER_STACK - (1 << 20) <= rsp && rsp <= addr && addr <= USER_STACK))
+			vm_stack_growth(addr);
+
+		page = spt_find_page(spt, addr);
+		if (page == NULL)
+			return false;
+		if (write == 1 && page->writable == 0) // write 불가능한 페이지에 write 요청한 경우
+			return false;
+		return vm_do_claim_page(page);
+	}
+	return false;
+	// return vm_do_claim_page(page);
 }
 
 /* Free the page.
@@ -240,7 +289,7 @@ vm_do_claim_page(struct page *page)
 	struct thread *current = thread_current();
 	pml4_set_page(current->pml4, page->va, frame->kva, page->writable);
 
-	return swap_in(page, frame->kva);
+	return swap_in(page, frame->kva); // uninit_initialize
 }
 
 /* Initialize new supplemental page table */
