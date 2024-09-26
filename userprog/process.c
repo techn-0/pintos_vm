@@ -24,11 +24,21 @@
 
 // 휘건 추가
 // #define VM
+#include "vm/file.c"
+#include "userprog/process.c"
 
 static void process_cleanup(void);
 static bool load(const char *file_name, struct intr_frame *if_);
 static void initd(void *f_name);
 static void __do_fork(void *);
+
+// 휘건 추가
+struct lazy_load_arg {
+    struct file *file;       // 로드할 파일
+    off_t ofs;               // 파일 오프셋 (위치)
+    uint8_t *upage;          // 메모리에서 할당된 페이지 주소
+    size_t page_read_bytes;  // 페이지에서 읽을 바이트 수
+};
 
 /* General process initializer for initd and other process. */
 static void
@@ -140,7 +150,7 @@ duplicate_pte(uint64_t *pte, void *va, void *aux)
 		current->pml4 = NULL;
 		pml4_activate(NULL);
 		pml4_destroy(pml4);
-		
+
 		palloc_free_page(newpage);
 		return false;
 	}
@@ -709,23 +719,23 @@ load_segment(struct file *file, off_t ofs, uint8_t *upage,
 }
 
 /* Create a minimal stack by mapping a zeroed page at the USER_STACK */
-static bool
-setup_stack(struct intr_frame *if_)
-{
-	uint8_t *kpage;
-	bool success = false;
+// static bool
+// setup_stack(struct intr_frame *if_)
+// {
+// 	uint8_t *kpage;
+// 	bool success = false;
 
-	kpage = palloc_get_page(PAL_USER | PAL_ZERO);
-	if (kpage != NULL)
-	{
-		success = install_page(((uint8_t *)USER_STACK) - PGSIZE, kpage, true);
-		if (success)
-			if_->rsp = USER_STACK;
-		else
-			palloc_free_page(kpage);
-	}
-	return success;
-}
+// 	kpage = palloc_get_page(PAL_USER | PAL_ZERO);
+// 	if (kpage != NULL)
+// 	{
+// 		success = install_page(((uint8_t *)USER_STACK) - PGSIZE, kpage, true);
+// 		if (success)
+// 			if_->rsp = USER_STACK;
+// 		else
+// 			palloc_free_page(kpage);
+// 	}
+// 	return success;
+// }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
  * virtual address KPAGE to the page table.
@@ -756,6 +766,20 @@ lazy_load_segment(struct page *page, void *aux)
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
+	struct lazy_load_arg *lazy_load_arg = (struct lazy_load_arg *)aux;
+
+	// 1) 파일의 position을 ofs으로 지정한다.
+	file_seek(lazy_load_arg->file, lazy_load_arg->ofs);
+	// 2) 파일을 read_bytes만큼 물리 프레임에 읽어 들인다.
+	if (file_read(lazy_load_arg->file, page->frame->kva, lazy_load_arg->read_bytes) != (int)(lazy_load_arg->read_bytes))
+	{
+		palloc_free_page(page->frame->kva);
+		return false;
+	}
+	// 3) 다 읽은 지점부터 zero_bytes만큼 0으로 채운다.
+	memset(page->frame->kva + lazy_load_arg->read_bytes, 0, lazy_load_arg->zero_bytes);
+
+	return true;
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -809,11 +833,16 @@ setup_stack(struct intr_frame *if_)
 	bool success = false;
 	void *stack_bottom = (void *)(((uint8_t *)USER_STACK) - PGSIZE);
 
-	/* TODO: Map the stack on stack_bottom and claim the page immediately.
-	 * TODO: If success, set the rsp accordingly.
-	 * TODO: You should mark the page is stack. */
-	/* TODO: Your code goes here */
-
+	if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1))
+	// VM_MARKER_0: 스택이 저장된 메모리 페이지임을 식별하기 위해 추가
+	// writable: argument_stack()에서 값을 넣어야 하니 True
+	{
+		// 2) 할당 받은 페이지에 바로 물리 프레임을 매핑한다.
+		success = vm_claim_page(stack_bottom);
+		if (success)
+			// 3) rsp를 변경한다. (argument_stack에서 이 위치부터 인자를 push한다.)
+			if_->rsp = USER_STACK;
+	}
 	return success;
 }
 #endif /* VM */

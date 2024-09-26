@@ -49,8 +49,8 @@ struct page
 	void *va;			 /* Address in terms of user space */
 	struct frame *frame; /* Back reference for frame */
 
-	/* Your implementation 즉, 준용 추가*/
-	struct hash_elem hash_elem;
+	/* Your implementation */
+	struct hash_elem hash_elem; // 휘건 추가
 	// 휘건 추가
 	bool writable;
 
