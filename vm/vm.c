@@ -56,11 +56,34 @@ bool vm_alloc_page_with_initializer(enum vm_type type, void *upage, bool writabl
 	struct supplemental_page_table *spt = &thread_current()->spt;
 
 	/* Check wheter the upage is already occupied or not. */
+	// upage가 사용 중인지 확인
 	if (spt_find_page(spt, upage) == NULL)
 	{
 		/* TODO: Create the page, fetch the initialier according to the VM type,
 		 * TODO: and then create "uninit" page struct by calling uninit_new. You
 		 * TODO: should modify the field after calling the uninit_new. */
+
+		// 휘건 추가
+		//  페이지 생성
+		struct page *p = (struct page *)malloc(sizeof(struct page));
+
+		// 타입에 따라 초기화 함수 가져옴
+		bool (*page_initializer)(struct page *, enum vm_type, void *);
+
+		switch (VM_TYPE(type))
+		{
+		case VM_ANON:
+			page_initializer = anon_initializer;
+			break;
+		case VM_FILE:
+			page_initializer = file_backed_initializer;
+			break;
+		}
+		// uninit 타입의 페이지로 초기화
+		uninit_new(p, upage, init, type, aux, page_initializer);
+		p->writable = writable;
+		// 생성한 페이지를 SPT에 추가
+		return spt_insert_page(spt, p);
 
 		/* TODO: Insert the page into the spt. */
 	}
@@ -96,8 +119,10 @@ bool spt_insert_page(struct supplemental_page_table *spt UNUSED,
 	// int succ = false;
 	/* TODO: Fill this function. */
 	// 휘건 추가
-	return hash_insert(&spt, &page->hash_elem) == NULL ? true : false; // 존재하지 않을 경우만 삽입
-																	   // return succ;
+	return hash_insert(&spt, &page->hash_elem) == NULL ? true : false;
+	// 존재하지 않을 경우만 삽입
+
+	// return succ;
 }
 
 void spt_remove_page(struct supplemental_page_table *spt, struct page *page)
@@ -136,6 +161,16 @@ vm_get_frame(void)
 {
 	struct frame *frame = NULL;
 	/* TODO: Fill this function. */
+	// 휘건 추가
+	void *kva = palloc_get_page(PAL_USER);
+	// user pool에서 새로운 프레임(물리) 가져옴
+
+	if (kva == NULL) // 페이지 할당 실패 시
+	{
+		PANIC("todo"); // OS 중지, 에러 정보 출력
+	}
+	frame = malloc(sizeof(struct frame)); // 프레임 할당
+	frame->kva = kva;					  // 프레임의 kva(멤버) 초기화
 
 	ASSERT(frame != NULL);
 	ASSERT(frame->page == NULL);
@@ -175,11 +210,17 @@ void vm_dealloc_page(struct page *page)
 }
 
 /* Claim the page that allocate on VA. */
+// va로 page를 찾아서 vm_do_claim_page 호출
 bool vm_claim_page(void *va UNUSED)
 {
 	struct page *page = NULL;
 	/* TODO: Fill this function */
 
+	// 휘건 추가
+	// spt에서 va에 해당하는 page 탐색
+	page = spt_find_page(&thread_current()->spt, va);
+	if (page == NULL)
+		return false;
 	return vm_do_claim_page(page);
 }
 
@@ -194,6 +235,10 @@ vm_do_claim_page(struct page *page)
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
+	// 휘건 추가
+	// 가상 주소 물리 주소 매핑
+	struct thread *current = thread_current();
+	pml4_set_page(current->pml4, page->va, frame->kva, page->writable);
 
 	return swap_in(page, frame->kva);
 }
