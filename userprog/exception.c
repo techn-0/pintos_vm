@@ -152,7 +152,7 @@ page_fault(struct intr_frame *f)
 	page_fault_cnt++;
 
 	//	준용 추가 (제작중 ㅎㅎ;)
-	if (user) {
+	if (user || not_present) {
 		exit(-1);
 	}
 

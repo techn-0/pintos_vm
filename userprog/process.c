@@ -20,6 +20,9 @@
 #include "intrinsic.h"
 #ifdef VM
 #include "vm/vm.h"
+// 휘건 추가
+#include "userprog/syscall.h"
+
 #endif
 
 static void process_cleanup(void);
@@ -29,17 +32,17 @@ static void __do_fork(void *);
 
 // 휘건 추가
 // lazy_load_arg 구조체 정의
-struct lazy_load_arg
-{
-	struct file *file;
-	off_t ofs;
-	size_t read_bytes;
-	size_t zero_bytes;
-};
+// struct lazy_load_arg
+// {
+// 	struct file *file;
+// 	off_t ofs;
+// 	size_t read_bytes;
+// 	size_t zero_bytes;
+// };
 
-	/* General process initializer for initd and other process. */
-	static void
-	process_init(void)
+/* General process initializer for initd and other process. */
+static void
+process_init(void)
 {
 	struct thread *current = thread_current();
 }
@@ -870,3 +873,15 @@ setup_stack(struct intr_frame *if_)
 	return success;
 }
 #endif /* VM */
+// 휘건 추가
+// 파일 객체를 검색하는 함수
+struct file *process_get_file(int fd)
+{
+	struct thread *curr = thread_current();
+	struct file **fdt = curr->fdt;
+	/* 파일 디스크립터에 해당하는 파일 객체를 리턴 */
+	/* 없을 시 NULL 리턴 */
+	if (fd < 2 || fd >= FDT_COUNT_LIMIT)
+		return NULL;
+	return fdt[fd];
+}

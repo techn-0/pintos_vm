@@ -33,6 +33,10 @@ typedef int tid_t;
 #define KERN_EXIT 0x2347861
 #define FD_MAX 40
 
+// 휘건 추가
+#define FDT_PAGES 2
+#define FDT_COUNT_LIMIT 128
+
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -115,6 +119,9 @@ struct thread
 	int recentCpu;
 	//	allList 에 포함되기 위해 사용되는 elem
 	struct list_elem allElem;
+
+	// 휘건 추가
+	struct file **fdt;
 
 #ifdef USERPROG
 	//	준용추가

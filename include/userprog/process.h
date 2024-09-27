@@ -9,5 +9,16 @@ int process_exec (void *f_name);
 int process_wait (tid_t);
 void process_exit (void);
 void process_activate (struct thread *next);
+// 휘건 추가
+struct file *process_get_file(int fd);
+
+// 휘건추가
+struct lazy_load_arg
+{
+    struct file *file;
+    off_t ofs;
+    uint32_t read_bytes;
+    uint32_t zero_bytes;
+};
 
 #endif /* userprog/process.h */

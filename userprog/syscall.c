@@ -15,8 +15,16 @@
 #include "threads/synch.h"
 #include <string.h>
 
+// 휘건 추가
+#include "devices/input.h"
+#include "lib/kernel/stdio.h"
+#include "vm/vm.h"
+
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
+
+// 휘건 추가
+void munmap(void *addr);
 
 /* System call.
  *
@@ -80,7 +88,9 @@ put_user(uint8_t *udst, uint8_t byte)
 void isLegalAddr(void *ptr)
 {
 	struct thread *th = thread_current();
-	if (is_kernel_vaddr(ptr) || ptr == NULL || pml4_get_page(th->pml4, ptr) == NULL)
+	// 재원 수정
+	if (is_kernel_vaddr(ptr) || ptr == NULL)// || pml4_get_page(th->pml4, ptr) == NULL
+	// if (is_kernel_vaddr(ptr) || ptr == NULL || pml4_get_page(th->pml4, ptr) == NULL) // 원래 코드
 	{
 		exit(-1);
 	}
@@ -260,6 +270,31 @@ tid_t wait(tid_t pid)
 	return process_wait(pid);
 }
 
+// 휘건 추가
+void *mmap(void *addr, size_t length, int writable, int fd, off_t offset)
+{
+	if (!addr || addr != pg_round_down(addr))
+		return NULL;
+
+	if (offset != pg_round_down(offset))
+		return NULL;
+
+	if (!is_user_vaddr(addr) || !is_user_vaddr(addr + length))
+		return NULL;
+
+	if (spt_find_page(&thread_current()->spt, addr))
+		return NULL;
+
+	struct file *f = process_get_file(fd);
+	if (f == NULL)
+		return NULL;
+
+	if (file_length(f) == 0 || (int)length <= 0)
+		return NULL;
+
+	return do_mmap(addr, length, writable, f, offset); // 파일이 매핑된 가상 주소 반환
+}
+
 /* The main system call interface */
 void syscall_handler(struct intr_frame *f)
 {
@@ -272,7 +307,7 @@ void syscall_handler(struct intr_frame *f)
 
 	//	systemcall 번호 - rax
 	//	인자 - rdi, rsi, rdx, r10, r8, r9
-	switch (f->R.rax)
+	switch (syscall_n)
 	{
 	case SYS_HALT:
 		power_off();
@@ -316,5 +351,15 @@ void syscall_handler(struct intr_frame *f)
 	case SYS_CLOSE:
 		close(f->R.rdi);
 		break;
+
+	// 휘건 추가
+	case SYS_MUNMAP:
+		munmap(f->R.rdi);
+		break;
 	}
+}
+
+void munmap(void *addr)
+{
+	do_munmap(addr);
 }
