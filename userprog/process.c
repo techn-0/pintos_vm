@@ -673,6 +673,7 @@ static bool install_page(void *upage, void *kpage, bool writable);
  * Return true if successful, false if a memory allocation error
  * or disk read error occurs. */
 static bool
+// 파일의 내용을 upage에 로드
 load_segment(struct file *file, off_t ofs, uint8_t *upage,
 			 uint32_t read_bytes, uint32_t zero_bytes, bool writable)
 {
@@ -761,6 +762,7 @@ install_page(void *upage, void *kpage, bool writable)
  * upper block. */
 
 static bool
+// 실행 파일의 내용을 페이지로 로딩
 lazy_load_segment(struct page *page, void *aux)
 {
 	/* TODO: Load the segment from the file */
@@ -769,6 +771,8 @@ lazy_load_segment(struct page *page, void *aux)
 
 	// 휘건 추가
 	struct lazy_load_arg *lazy_load_arg = (struct lazy_load_arg *)aux;
+	// aux : load_segment에서 로딩을 위해 설정해둔 정보인 lazy_load_arg
+	// 이 정보를 사용해 읽어올 파일을 찾아 메모리에 로딩
 
 	// 1) 파일의 position을 ofs으로 지정한다.
 	file_seek(lazy_load_arg->file, lazy_load_arg->ofs);
@@ -851,6 +855,7 @@ setup_stack(struct intr_frame *if_)
 {
 	bool success = false;
 	void *stack_bottom = (void *)(((uint8_t *)USER_STACK) - PGSIZE);
+	// 스택은 아래로 성장, USER_STACK에서 PGSIZE만큼 아래로 내린 지점에 페이지 생성
 
 	/* TODO: Map the stack on stack_bottom and claim the page immediately.
 	 * TODO: If success, set the rsp accordingly.
@@ -858,15 +863,15 @@ setup_stack(struct intr_frame *if_)
 	/* TODO: Your code goes here */
 
 	// 휘건 추가
-	// 1) stack_bottom에 페이지를 하나 할당받는다.
+	// stack_bottom에 페이지 하나 할당받음
 	if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1))
 	// VM_MARKER_0: 스택이 저장된 메모리 페이지임을 식별하기 위해 추가
 	// writable: argument_stack()에서 값을 넣어야 하니 True
 	{
-		// 2) 할당 받은 페이지에 바로 물리 프레임을 매핑한다.
+		// 할당 받은 페이지에  물리 프레임 매핑
 		success = vm_claim_page(stack_bottom);
 		if (success)
-			// 3) rsp를 변경한다. (argument_stack에서 이 위치부터 인자를 push한다.)
+			// rsp를 변경 (argument_stack에서 이 위치부터 인자 push)
 			if_->rsp = USER_STACK;
 	}
 

@@ -13,6 +13,7 @@
 unsigned
 page_hash(const struct hash_elem *p_, void *aux UNUSED);
 bool page_less(const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
+void hash_page_destroy(struct hash_elem *e, void *aux);
 // 휘건 추가
 // lazy_load_arg 구조체 정의
 // struct lazy_load_arg
@@ -122,12 +123,15 @@ spt_find_page(struct supplemental_page_table *spt UNUSED, void *va UNUSED)
 
 	// 휘건 추가
 	page = (struct page *)malloc(sizeof(struct page));
-	struct hash_elem *e;
+	struct hash_elem *e; // 해시 요소를 저장할 포인터 정의
 
 	// va에 해당하는 hash_elem 탐색
 	page->va = pg_round_down(va); // page의 시작 주소 할당
 	e = hash_find(&spt->spt_hash, &page->hash_elem);
+	// 페이지 테이블의 해시 테이블에서 해당 가상 주소에 대한 페이지 팀색
+
 	free(page);
+
 	// 찾으면 e에 해당하는 페이지 리턴
 	return e != NULL ? hash_entry(e, struct page, hash_elem) : NULL;
 	// return page;
@@ -186,15 +190,17 @@ vm_get_frame(void)
 	struct frame *frame = NULL;
 	/* TODO: Fill this function. */
 	// 휘건 추가
-	void *kva = palloc_get_page(PAL_USER);
+	void *kva = palloc_get_page(PAL_USER | PAL_ZERO);
 	// user pool에서 새로운 프레임(물리) 가져옴
 
 	if (kva == NULL) // 페이지 할당 실패 시
 	{
 		struct frame *victim = vm_evict_frame();
 		victim->page = NULL;
+
 		// 혜민 추가
-		PANIC("todo"); // OS를 중지시키고, 소스 파일명, 라인 번호, 함수명 등의 정보와 함께 사용자 지정 메시지를 출력
+		// PANIC("todo"); // OS를 중지, 오류 정보 출력
+
 		return victim;
 	}
 	frame = (struct frame *)malloc(sizeof(struct frame)); // 프레임 할당
@@ -238,7 +244,7 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
 	if (is_kernel_vaddr(addr))
 		return false;
 
-	if (not_present) // 접근한 메모리의 physical page가 존재하지 않은 경우
+	if (not_present) // 접근한 메모리의 physical page가 존재하지 않을 때
 	{
 		void *rsp = f->rsp;
 		/* TODO: Validate the fault */
@@ -250,10 +256,10 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
 		// 	return vm_do_claim_page(page);
 		// }
 		// return false;
-		if (!user) // kernel access인 경우 thread에서 rsp를 가져와야 한다.
+		if (!user) // kernel access인 경우 thread에서 rsp를 가져와야 함
 			rsp = thread_current()->rsp;
 
-		// 스택 확장으로 처리할 수 있는 폴트인 경우, vm_stack_growth를 호출
+		// 스택 확장으로 처리할 수 있는 폴트인 경우, vm_stack_growth 호출
 		if ((USER_STACK - (1 << 20) <= rsp - 8 && rsp - 8 == addr && addr <= USER_STACK) || (USER_STACK - (1 << 20) <= rsp && rsp <= addr && addr <= USER_STACK))
 			vm_stack_growth(addr);
 
@@ -284,18 +290,18 @@ bool vm_claim_page(void *va UNUSED)
 	/* TODO: Fill this function */
 
 	// 휘건 추가
-	// spt에서 va에 해당하는 page 탐색
+	// spt에서 va에 해당하는 page 탐색해 가져옴
 	page = spt_find_page(&thread_current()->spt, va);
 	if (page == NULL)
 		return false;
-	return vm_do_claim_page(page);
+	return vm_do_claim_page(page); // page에 물리 프레임 할당
 }
 
 /* Claim the PAGE and set up the mmu. */
 static bool
 vm_do_claim_page(struct page *page)
 {
-	struct frame *frame = vm_get_frame();
+	struct frame *frame = vm_get_frame(); // 프레임 가져옴
 
 	/* Set links */
 	frame->page = page;
@@ -314,23 +320,33 @@ vm_do_claim_page(struct page *page)
 void supplemental_page_table_init(struct supplemental_page_table *spt UNUSED)
 {
 	// 휘건 추가
+	// SPT를 초기화
 	hash_init(spt, page_hash, page_less, NULL);
 	// page_hash, page_less도 구현해 주어야 함
 }
 // 휘건 추가 함수
+// 가상 주소를 hashed index로 변환하는 함수
 unsigned
 page_hash(const struct hash_elem *p_, void *aux UNUSED)
 {
 	const struct page *p = hash_entry(p_, struct page, hash_elem);
+	// 해시테이블 요소 p_를 page 구조체로 변환
 	return hash_bytes(&p->va, sizeof p->va);
+	// 페이지의 가상주소(va)를 바이트 단위로 해싱해 해당 주소를 기반으로 해시 값 반환
 }
+
 // 휘건 추가 함수
+// 해시 테이블 내 두 페이지 요소에 대해 주소값을 비교하는 함수
 bool page_less(const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED)
 {
 	const struct page *a = hash_entry(a_, struct page, hash_elem);
+	// 해시 테이블 요소 a와 b를 page 구조체로 변환
 	const struct page *b = hash_entry(b_, struct page, hash_elem);
 
 	return a->va < b->va;
+	// p_a의 가상 주소(va)가 p_b의 가상 주소보다 작은 경우 true
+
+	// aux는 추가적인 데이터를 전달할 수 있지만 사용되지 않음
 }
 
 /* Copy supplemental page table from src to dst */
@@ -351,7 +367,7 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
 		void *upage = src_page->va;
 		bool writable = src_page->writable;
 
-		/* 1) type이 uninit이면 */
+		/* type이 uninit이면 */
 		if (type == VM_UNINIT)
 		{ // uninit page 생성 & 초기화
 			vm_initializer *init = src_page->uninit.init;
@@ -360,7 +376,7 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
 			continue;
 		}
 
-		/* 2) type이 file이면 */
+		/* type이 file이면 */
 		if (type == VM_FILE)
 		{
 			struct lazy_load_arg *file_aux = malloc(sizeof(struct lazy_load_arg));
@@ -377,7 +393,7 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
 			continue;
 		}
 
-		/* 3) type이 anon이면 */
+		/* type이 anon이면 */
 		if (!vm_alloc_page(type, upage, writable)) // uninit page 생성 & 초기화
 			return false;						   // init이랑 aux는 Lazy Loading에 필요. 지금 만드는 페이지는 기다리지 않고 바로 내용을 넣어줄 것이므로 필요 없음
 
@@ -397,4 +413,12 @@ void supplemental_page_table_kill(struct supplemental_page_table *spt UNUSED)
 {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
+	hash_clear(&spt->spt_hash, hash_page_destroy); // 해시 테이블 모든 요소를 제거
+}
+
+void hash_page_destroy(struct hash_elem *e, void *aux)
+{
+	struct page *page = hash_entry(e, struct page, hash_elem);
+	// destroy(page);
+	free(page);
 }

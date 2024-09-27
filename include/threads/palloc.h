@@ -15,7 +15,7 @@ enum palloc_flags {
 extern size_t user_page_limit;
 
 uint64_t palloc_init (void);
-void *palloc_get_page (enum palloc_flags);
+void *palloc_get_page (enum palloc_flags); // 물리 페이지를 할당하고, 해당 페이지의 커널 가상 주소를 반환
 void *palloc_get_multiple (enum palloc_flags, size_t page_cnt);
 void palloc_free_page (void *);
 void palloc_free_multiple (void *, size_t page_cnt);

@@ -152,9 +152,9 @@ page_fault(struct intr_frame *f)
 	page_fault_cnt++;
 
 	//	준용 추가 (제작중 ㅎㅎ;)
-	if (user || not_present) {
+	
 		exit(-1);
-	}
+	
 
 	/* If the fault is true fault, show info and exit. */
 	printf("Page fault at %p: %s error %s page in %s context.\n",

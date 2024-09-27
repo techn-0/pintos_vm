@@ -256,13 +256,13 @@ int exec(const char *cmd_line)
 	isLegalAddr(cmd_line);
 	char *cmdCopy = palloc_get_page(0);
 
-	file_close(thread_current()->execFile);
+	// file_close(thread_current()->execFile);
 	strlcpy(cmdCopy, cmd_line, PGSIZE);
-	if (process_exec(cmdCopy))
-	{
-		exit(-1);
-	}
-	return -1;
+
+	process_exec(cmdCopy);
+	// exit(-1);
+	
+	
 }
 
 tid_t wait(tid_t pid)
