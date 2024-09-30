@@ -153,7 +153,7 @@ page_fault(struct intr_frame *f)
 
 	//	준용 추가 (제작중 ㅎㅎ;)
 	
-		exit(-1);
+	exit(-1);
 	
 
 	/* If the fault is true fault, show info and exit. */

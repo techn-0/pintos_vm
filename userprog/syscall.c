@@ -50,6 +50,9 @@ void syscall_init(void)
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			  FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+
+	// 휘건 추가
+	lock_init(&filesys_lock);
 }
 
 //	준용 추가
@@ -89,7 +92,7 @@ void isLegalAddr(void *ptr)
 {
 	struct thread *th = thread_current();
 	// 재원 수정
-	if (is_kernel_vaddr(ptr) || ptr == NULL)// || pml4_get_page(th->pml4, ptr) == NULL
+	if (is_kernel_vaddr(ptr) || ptr == NULL) // || pml4_get_page(th->pml4, ptr) == NULL
 	// if (is_kernel_vaddr(ptr) || ptr == NULL || pml4_get_page(th->pml4, ptr) == NULL) // 원래 코드
 	{
 		exit(-1);
@@ -261,8 +264,6 @@ int exec(const char *cmd_line)
 
 	process_exec(cmdCopy);
 	// exit(-1);
-	
-	
 }
 
 tid_t wait(tid_t pid)
@@ -296,7 +297,7 @@ void *mmap(void *addr, size_t length, int writable, int fd, off_t offset)
 }
 
 /* The main system call interface */
-void syscall_handler(struct intr_frame *f)
+void syscall_handler(struct intr_frame *f UNUSED)
 {
 	// TODO: Your implementation goes here.
 	// 휘건 추가
@@ -352,7 +353,11 @@ void syscall_handler(struct intr_frame *f)
 		close(f->R.rdi);
 		break;
 
-	// 휘건 추가
+		// 휘건 추가
+
+	case SYS_MMAP:
+		f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+		break;
 	case SYS_MUNMAP:
 		munmap(f->R.rdi);
 		break;

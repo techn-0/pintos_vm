@@ -9,7 +9,7 @@
 #include "userprog/process.h"
 
 // 휘건 추가
-#include "threads/vaddr.h"
+// #include "threads/vaddr.h"
 unsigned
 page_hash(const struct hash_elem *p_, void *aux UNUSED);
 bool page_less(const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
@@ -43,6 +43,8 @@ void vm_init(void)
 	register_inspect_intr();
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
+	list_init(&frame_table);
+	lock_init(&frame_table_lock);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -154,7 +156,6 @@ void spt_remove_page(struct supplemental_page_table *spt, struct page *page)
 {
 	// 휘건 추가
 	hash_delete(&spt->spt_hash, &page->hash_elem);
-
 	vm_dealloc_page(page);
 	return true;
 }
@@ -165,7 +166,27 @@ vm_get_victim(void)
 {
 	struct frame *victim = NULL;
 	/* TODO: The policy for eviction is up to you. */
+	struct thread *curr = thread_current();
 
+	lock_acquire(&frame_table_lock);
+	struct list_elem *start = list_begin(&frame_table);
+	for (start; start != list_end(&frame_table); start = list_next(start))
+	{
+		victim = list_entry(start, struct frame, frame_elem);
+		if (victim->page == NULL) // frame에 할당된 페이지가 없는 경우 (page가 destroy된 경우 )
+		{
+			lock_release(&frame_table_lock);
+			return victim;
+		}
+		if (pml4_is_accessed(curr->pml4, victim->page->va))
+			pml4_set_accessed(curr->pml4, victim->page->va, 0);
+		else
+		{
+			lock_release(&frame_table_lock);
+			return victim;
+		}
+	}
+	lock_release(&frame_table_lock);
 	return victim;
 }
 
@@ -176,8 +197,12 @@ vm_evict_frame(void)
 {
 	struct frame *victim UNUSED = vm_get_victim();
 	/* TODO: swap out the victim and return the evicted frame. */
+	// 휘건 추가
+	if (victim->page)
+		swap_out(victim->page);
+	return victim;
 
-	return NULL;
+	// return NULL;
 }
 
 /* palloc() and get frame. If there is no available page, evict the page
@@ -207,9 +232,9 @@ vm_get_frame(void)
 	frame->kva = kva;									  // 프레임의 kva(멤버) 초기화
 	frame->page = NULL;
 
-	// lock_acquire(&frame_table_lock);
-	// list_push_back(&frame_table, &frame->frame_elem);
-	// lock_release(&frame_table_lock);
+	lock_acquire(&frame_table_lock);
+	list_push_back(&frame_table, &frame->frame_elem);
+	lock_release(&frame_table_lock);
 	ASSERT(frame != NULL);
 	ASSERT(frame->page == NULL);
 	return frame;
@@ -321,7 +346,7 @@ void supplemental_page_table_init(struct supplemental_page_table *spt UNUSED)
 {
 	// 휘건 추가
 	// SPT를 초기화
-	hash_init(spt, page_hash, page_less, NULL);
+	hash_init(&spt->spt_hash, page_hash, page_less, NULL);
 	// page_hash, page_less도 구현해 주어야 함
 }
 // 휘건 추가 함수
@@ -419,6 +444,7 @@ void supplemental_page_table_kill(struct supplemental_page_table *spt UNUSED)
 void hash_page_destroy(struct hash_elem *e, void *aux)
 {
 	struct page *page = hash_entry(e, struct page, hash_elem);
-	// destroy(page);
+	// ??
+	destroy(page);
 	free(page);
 }

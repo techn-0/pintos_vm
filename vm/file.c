@@ -32,6 +32,9 @@ static const struct page_operations file_ops = {
 /* The initializer of file vm */
 void vm_file_init(void)
 {
+	// 휘건 추가
+	// todo: file-backed page와 관련된 모든 설정을 수행할 수 있습니다.
+	
 }
 
 /* Initialize the file backed page */
@@ -57,6 +60,7 @@ static bool
 file_backed_swap_in(struct page *page, void *kva)
 {
 	struct file_page *file_page UNUSED = &page->file;
+	return lazy_load_segment(page, file_page);
 }
 
 /* Swap out the page by writeback contents to the file. */
@@ -100,9 +104,9 @@ do_mmap(void *addr, size_t length, int writable,
 
 	while (read_bytes > 0 || zero_bytes > 0)
 	{
-		/* 이 페이지를 채우는 방법을 계산합니다.
+		/* 이 페이지를 채우는 방법을 계산
 		파일에서 PAGE_READ_BYTES 바이트를 읽고
-		최종 PAGE_ZERO_BYTES 바이트를 0으로 채웁니다. */
+		최종 PAGE_ZERO_BYTES 바이트를 0으로 채움 */
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
@@ -112,7 +116,7 @@ do_mmap(void *addr, size_t length, int writable,
 		lazy_load_arg->read_bytes = page_read_bytes;
 		lazy_load_arg->zero_bytes = page_zero_bytes;
 
-		// vm_alloc_page_with_initializer를 호출하여 대기 중인 객체를 생성합니다.
+		// vm_alloc_page_with_initializer를 호출하여 대기 중인 객체를 생성
 		if (!vm_alloc_page_with_initializer(VM_FILE, addr,
 											writable, lazy_load_segment, lazy_load_arg))
 			return NULL;
@@ -121,7 +125,7 @@ do_mmap(void *addr, size_t length, int writable,
 		p->mapped_page_count = total_page_count;
 
 		/* Advance. */
-		// 읽은 바이트와 0으로 채운 바이트를 추적하고 가상 주소를 증가시킵니다.
+		// 읽은 바이트와 0으로 채운 바이트를 추적하고 가상 주소를 증가
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		addr += PGSIZE;
