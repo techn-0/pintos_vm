@@ -122,6 +122,7 @@ struct thread
 
 	// 휘건 추가
 	struct file **fdt;
+	int exit_status;
 
 #ifdef USERPROG
 	//	준용추가

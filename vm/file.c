@@ -34,7 +34,6 @@ void vm_file_init(void)
 {
 	// 휘건 추가
 	// todo: file-backed page와 관련된 모든 설정을 수행할 수 있습니다.
-	
 }
 
 /* Initialize the file backed page */
@@ -145,6 +144,17 @@ void do_munmap(void *addr)
 	{
 		if (p)
 			destroy(p);
+		// {
+		// 	if (pml4_get_page(thread_current()->pml4, p->va))
+		// 		// 매핑된 프레임이 있다면 = swap out 되지 않았다면 -> 페이지를 제거하고 연결된 프레임도 제거
+		// 		spt_remove_page(spt, p);
+		// 	else
+		// 	{ // swap out된 경우에는 매핑된 프레임이 없으므로 페이지만 제거
+		// 		hash_delete(&spt->spt_hash, &p->hash_elem);
+		// 		free(p);
+		// 	}
+		// }
+		// pml4_clear_page(thread_current()->pml4, p->va);
 		addr += PGSIZE;
 		p = spt_find_page(spt, addr);
 	}

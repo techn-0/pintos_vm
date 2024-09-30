@@ -25,6 +25,8 @@ void syscall_handler(struct intr_frame *);
 
 // 휘건 추가
 void munmap(void *addr);
+void check_address(void *addr);
+void *mmap(void *addr, size_t length, int writable, int fd, off_t offset);
 
 /* System call.
  *
@@ -61,32 +63,41 @@ void syscall_init(void)
  * UADDR must be below KERN_BASE.
  * Returns the byte value if successful, -1 if a segfault
  * occurred. */
-static int64_t
-get_user(const uint8_t *uaddr)
+// static int64_t
+// get_user(const uint8_t *uaddr)
+// {
+// 	int64_t result;
+// 	__asm __volatile(
+// 		"movabsq $done_get, %0\n"
+// 		"movzbq %1, %0\n"
+// 		"done_get:\n"
+// 		: "=&a"(result) : "m"(*uaddr));
+// 	return result;
+// }
+
+// 휘건 추가
+void check_address(void *addr)
 {
-	int64_t result;
-	__asm __volatile(
-		"movabsq $done_get, %0\n"
-		"movzbq %1, %0\n"
-		"done_get:\n"
-		: "=&a"(result) : "m"(*uaddr));
-	return result;
+	if (addr == NULL)
+		exit(-1);
+	if (!is_user_vaddr(addr))
+		exit(-1);
 }
 
 /* Writes BYTE to user address UDST.
  * UDST must be below KERN_BASE.
  * Returns true if successful, false if a segfault occurred. */
-static bool
-put_user(uint8_t *udst, uint8_t byte)
-{
-	int64_t error_code;
-	__asm __volatile(
-		"movabsq $done_put, %0\n"
-		"movb %b2, %1\n"
-		"done_put:\n"
-		: "=&a"(error_code), "=m"(*udst) : "q"(byte));
-	return error_code != -1;
-}
+// static bool
+// put_user(uint8_t *udst, uint8_t byte)
+// {
+// 	int64_t error_code;
+// 	__asm __volatile(
+// 		"movabsq $done_put, %0\n"
+// 		"movb %b2, %1\n"
+// 		"done_put:\n"
+// 		: "=&a"(error_code), "=m"(*udst) : "q"(byte));
+// 	return error_code != -1;
+// }
 
 void isLegalAddr(void *ptr)
 {
@@ -104,6 +115,14 @@ void exit(int status)
 	thread_current()->exitStatus = status;
 	thread_exit();
 }
+
+// void exit(int status)
+// {
+// 	struct thread *curr = thread_current();
+// 	curr->exit_status = status; // 이거 wait에서 사용?
+// 	printf("%s: exit(%d)\n", curr->name, status);
+// 	thread_exit();
+// }
 
 tid_t fork(const char *thread_name, struct intr_frame *frame)
 {
@@ -181,11 +200,20 @@ int filesize(int fd)
 	}
 }
 
-int read(int fd, void *buffer, unsigned size)
+int read(int fd, void *buffer, unsigned size) // 권한 검사 추가해야 함
 {
 	isLegalAddr(buffer);
+	// check_address(buffer);
+
 	if (isFileOpened(fd))
 	{
+		// 페이지에서 해당 주소의 권한을 확인
+		struct page *page = spt_find_page(&thread_current()->spt, buffer);
+		if (page && !page->writable) // 페이지가 존재하고 쓰기 가능하지 않으면
+		{
+			exit(-1); // 잘못된 접근 시 종료
+		}
+
 		struct file *target = thread_current()->descriptors[fd];
 		off_t returnValue = file_read(target, buffer, (off_t)size);
 		return returnValue;
@@ -199,6 +227,7 @@ int read(int fd, void *buffer, unsigned size)
 int write(int fd, const void *buffer, unsigned size)
 {
 	isLegalAddr(buffer);
+
 	if (fd == STDOUT_FILENO)
 	{
 		putbuf(buffer, size);
@@ -207,6 +236,13 @@ int write(int fd, const void *buffer, unsigned size)
 	else if (isFileOpened(fd))
 	{
 		struct file *target = thread_current()->descriptors[fd];
+
+		// struct page *page = spt_find_page(&thread_current()->spt, buffer);
+		// if (page && !page->writable) // 페이지가 존재하고 쓰기 가능하지 않으면
+		// {
+		// 	exit(-1); // 잘못된 접근 시 종료
+		// }
+
 		off_t returnValue = file_write(target, buffer, (off_t)size);
 		return returnValue;
 	}
@@ -265,6 +301,28 @@ int exec(const char *cmd_line)
 	process_exec(cmdCopy);
 	// exit(-1);
 }
+
+// int exec(const char *cmd_line)
+// {
+// 	isLegalAddr(cmd_line);
+
+// 	// process.c 파일의 process_create_initd 함수와 유사하다.
+// 	// 단, 스레드를 새로 생성하는 건 fork에서 수행하므로
+// 	// 이 함수에서는 새 스레드를 생성하지 않고 process_exec을 호출한다.
+
+// 	// process_exec 함수 안에서 filename을 변경해야 하므로
+// 	// 커널 메모리 공간에 cmd_line의 복사본을 만든다.
+// 	// (현재는 const char* 형식이기 때문에 수정할 수 없다.)
+// 	char *cmd_line_copy;
+// 	cmd_line_copy = palloc_get_page(0);
+// 	if (cmd_line_copy == NULL)
+// 		exit(-1);							  // 메모리 할당 실패 시 status -1로 종료한다.
+// 	strlcpy(cmd_line_copy, cmd_line, PGSIZE); // cmd_line을 복사한다.
+
+// 	// 스레드의 이름을 변경하지 않고 바로 실행한다.
+// 	if (process_exec(cmd_line_copy) == -1)
+// 		exit(-1); // 실패 시 status -1로 종료한다.
+// }
 
 tid_t wait(tid_t pid)
 {
@@ -358,6 +416,7 @@ void syscall_handler(struct intr_frame *f UNUSED)
 	case SYS_MMAP:
 		f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
 		break;
+
 	case SYS_MUNMAP:
 		munmap(f->R.rdi);
 		break;
