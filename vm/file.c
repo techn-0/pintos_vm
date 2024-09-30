@@ -140,6 +140,7 @@ void do_munmap(void *addr)
 	struct supplemental_page_table *spt = &thread_current()->spt;
 	struct page *p = spt_find_page(spt, addr);
 	int count = p->mapped_page_count;
+
 	for (int i = 0; i < count; i++)
 	{
 		if (p)
@@ -155,6 +156,20 @@ void do_munmap(void *addr)
 		// 	}
 		// }
 		// pml4_clear_page(thread_current()->pml4, p->va);
+
+		// 휘건 추가
+		if (p != NULL) {
+            // 매핑된 프레임이 있다면
+            if (pml4_get_page(thread_current()->pml4, p->va)) {
+                // 페이지와 매핑된 프레임 해제
+                spt_remove_page(spt, p);
+            } else {
+                // 프레임이 매핑되지 않은 경우, 페이지만 제거
+                hash_delete(&spt->spt_hash, &p->hash_elem);
+                free(p);  // 페이지 구조체 메모리 해제
+            }
+        }
+
 		addr += PGSIZE;
 		p = spt_find_page(spt, addr);
 	}

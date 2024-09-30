@@ -215,7 +215,8 @@ vm_get_frame(void)
 	struct frame *frame = NULL;
 	/* TODO: Fill this function. */
 	// 휘건 추가
-	void *kva = palloc_get_page(PAL_USER | PAL_ZERO);
+	// void *kva = palloc_get_page(PAL_USER | PAL_ZERO);
+	void *kva = palloc_get_page(PAL_USER);
 	// user pool에서 새로운 프레임(물리) 가져옴
 
 	if (kva == NULL) // 페이지 할당 실패 시
