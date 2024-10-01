@@ -340,17 +340,19 @@ void *mmap(void *addr, size_t length, int writable, int fd, off_t offset)
 
 	if (!is_user_vaddr(addr) || !is_user_vaddr(addr + length))
 		return NULL;
-
+	// printf("\n\nhelli1\n\n");
 	if (spt_find_page(&thread_current()->spt, addr))
 		return NULL;
+	// printf("\n\nhelli2\n\n");
 
-	struct file *f = process_get_file(fd);
+	struct file *f = thread_current()->descriptors[fd];
 	if (f == NULL)
 		return NULL;
+	// printf("\n\nhelli3\n\n");
 
-	if (file_length(f) == 0 || (int)length <= 0)
+	if ((int)length <= 0)
 		return NULL;
-
+	// printf("\n\nhelli4\n\n");
 	return do_mmap(addr, length, writable, f, offset); // 파일이 매핑된 가상 주소 반환
 }
 

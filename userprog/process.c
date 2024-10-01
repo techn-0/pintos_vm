@@ -886,7 +886,9 @@ struct file *process_get_file(int fd)
 	struct file **fdt = curr->fdt;
 	/* 파일 디스크립터에 해당하는 파일 객체를 리턴 */
 	/* 없을 시 NULL 리턴 */
-	if (fd < 2 || fd >= FDT_COUNT_LIMIT)
+	// printf("\n\n%p\n\n", fdt[fd]);
+
+	if (fd < 3 || fd >= FDT_COUNT_LIMIT)
 		return NULL;
 	return fdt[fd];
 }

@@ -84,10 +84,30 @@ file_backed_destroy(struct page *page)
 }
 
 /* Do the mmap */
+
+// 휘건 추가
+static bool
+lazy_load_mmap (struct page *page, void *aux) {
+	struct lazy_load_arg *l = aux;
+
+	file_seek(l->file, l->ofs);
+
+	if(file_read(l->file, page->frame->kva, l->read_bytes) == NULL){
+		palloc_free_page(page->frame->kva);
+		return false;
+	}
+
+	memset(page->frame->kva + l->read_bytes, 0, l->zero_bytes);
+	pml4_set_dirty(thread_current()->pml4, page->va, true);
+	return true;
+}
+
+
 void *
 do_mmap(void *addr, size_t length, int writable,
 		struct file *file, off_t offset)
 {
+	// printf("집에보내줘");
 	// 휘건 추가
 	struct file *f = file_reopen(file);
 	void *start_addr = addr; // 매핑 성공 시 파일이 매핑된 가상 주소 반환하는 데 사용
@@ -97,12 +117,14 @@ do_mmap(void *addr, size_t length, int writable,
 	size_t read_bytes = file_length(f) < length ? file_length(f) : length;
 	size_t zero_bytes = PGSIZE - read_bytes % PGSIZE;
 
-	ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
-	ASSERT(pg_ofs(addr) == 0);	  // upage가 페이지 정렬되어 있는지 확인
-	ASSERT(offset % PGSIZE == 0); // ofs가 페이지 정렬되어 있는지 확인
+	// ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
+	// ASSERT(pg_ofs(addr) == 0);	  // upage가 페이지 정렬되어 있는지 확인
+	// ASSERT(offset % PGSIZE == 0); // ofs가 페이지 정렬되어 있는지 확인
 
 	while (read_bytes > 0 || zero_bytes > 0)
-	{
+	{	
+	
+
 		/* 이 페이지를 채우는 방법을 계산
 		파일에서 PAGE_READ_BYTES 바이트를 읽고
 		최종 PAGE_ZERO_BYTES 바이트를 0으로 채움 */
@@ -117,7 +139,7 @@ do_mmap(void *addr, size_t length, int writable,
 
 		// vm_alloc_page_with_initializer를 호출하여 대기 중인 객체를 생성
 		if (!vm_alloc_page_with_initializer(VM_FILE, addr,
-											writable, lazy_load_segment, lazy_load_arg))
+											writable, lazy_load_mmap, lazy_load_arg))
 			return NULL;
 
 		struct page *p = spt_find_page(&thread_current()->spt, start_addr);
@@ -137,42 +159,42 @@ do_mmap(void *addr, size_t length, int writable,
 /* Do the munmap */
 void do_munmap(void *addr)
 {
-	struct supplemental_page_table *spt = &thread_current()->spt;
-	struct page *p = spt_find_page(spt, addr);
-	int count = p->mapped_page_count;
+	// struct supplemental_page_table *spt = &thread_current()->spt;
+	// struct page *p = spt_find_page(spt, addr);
+	// int count = p->mapped_page_count;
 
-	for (int i = 0; i < count; i++)
-	{
-		if (p)
-			destroy(p);
-		// {
-		// 	if (pml4_get_page(thread_current()->pml4, p->va))
-		// 		// 매핑된 프레임이 있다면 = swap out 되지 않았다면 -> 페이지를 제거하고 연결된 프레임도 제거
-		// 		spt_remove_page(spt, p);
-		// 	else
-		// 	{ // swap out된 경우에는 매핑된 프레임이 없으므로 페이지만 제거
-		// 		hash_delete(&spt->spt_hash, &p->hash_elem);
-		// 		free(p);
-		// 	}
-		// }
-		// pml4_clear_page(thread_current()->pml4, p->va);
+	// for (int i = 0; i < count; i++)
+	// {
+	// 	if (p)
+	// 		destroy(p);
+	// 	// {
+	// 	// 	if (pml4_get_page(thread_current()->pml4, p->va))
+	// 	// 		// 매핑된 프레임이 있다면 = swap out 되지 않았다면 -> 페이지를 제거하고 연결된 프레임도 제거
+	// 	// 		spt_remove_page(spt, p);
+	// 	// 	else
+	// 	// 	{ // swap out된 경우에는 매핑된 프레임이 없으므로 페이지만 제거
+	// 	// 		hash_delete(&spt->spt_hash, &p->hash_elem);
+	// 	// 		free(p);
+	// 	// 	}
+	// 	// }
+	// 	// pml4_clear_page(thread_current()->pml4, p->va);
 
-		// 휘건 추가
-		if (p != NULL) {
-            // 매핑된 프레임이 있다면
-            if (pml4_get_page(thread_current()->pml4, p->va)) {
-                // 페이지와 매핑된 프레임 해제
-                spt_remove_page(spt, p);
-            } else {
-                // 프레임이 매핑되지 않은 경우, 페이지만 제거
-                hash_delete(&spt->spt_hash, &p->hash_elem);
-                free(p);  // 페이지 구조체 메모리 해제
-            }
-        }
+	// 	// 휘건 추가
+	// 	if (p != NULL) {
+    //         // 매핑된 프레임이 있다면
+    //         if (pml4_get_page(thread_current()->pml4, p->va)) {
+    //             // 페이지와 매핑된 프레임 해제
+    //             spt_remove_page(spt, p);
+    //         } else {
+    //             // 프레임이 매핑되지 않은 경우, 페이지만 제거
+    //             hash_delete(&spt->spt_hash, &p->hash_elem);
+    //             free(p);  // 페이지 구조체 메모리 해제
+    //         }
+    //     }
 
-		addr += PGSIZE;
-		p = spt_find_page(spt, addr);
-	}
+	// 	addr += PGSIZE;
+	// 	p = spt_find_page(spt, addr);
+	// }
 }
 
 // 휘건 추기
