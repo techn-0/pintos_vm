@@ -227,7 +227,6 @@ int read(int fd, void *buffer, unsigned size) // 권한 검사 추가해야 함
 int write(int fd, const void *buffer, unsigned size)
 {
 	isLegalAddr(buffer);
-
 	if (fd == STDOUT_FILENO)
 	{
 		putbuf(buffer, size);
@@ -236,13 +235,6 @@ int write(int fd, const void *buffer, unsigned size)
 	else if (isFileOpened(fd))
 	{
 		struct file *target = thread_current()->descriptors[fd];
-
-		struct page *page = spt_find_page(&thread_current()->spt, buffer);
-		if (page && !page->writable) // 페이지가 존재하고 쓰기 가능하지 않으면
-		{
-			exit(-1); // 잘못된 접근 시 종료
-		}
-
 		off_t returnValue = file_write(target, buffer, (off_t)size);
 		return returnValue;
 	}

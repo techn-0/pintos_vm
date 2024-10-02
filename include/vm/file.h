@@ -9,10 +9,12 @@ enum vm_type;
 // 휘건 추가
 struct file_page
 {
-	struct file *file;
-	off_t ofs;
-	uint32_t read_bytes;
-	uint32_t zero_bytes;
+	// struct file *file;
+	// off_t ofs;
+	// uint32_t read_bytes;
+	// uint32_t zero_bytes;
+
+	struct fileReader *fr;
 };
 
 void vm_file_init(void);

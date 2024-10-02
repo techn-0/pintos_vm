@@ -108,6 +108,16 @@ struct supplemental_page_table
 	struct hash spt_hash;
 };
 
+//	준용 추가
+struct fileReader
+{
+	struct file *target;
+	size_t pageReadBytes;
+	size_t pageZeroBytes;
+	off_t offset;
+	int mappedCnt;
+};
+
 #include "threads/thread.h"
 void supplemental_page_table_init(struct supplemental_page_table *spt);
 bool supplemental_page_table_copy(struct supplemental_page_table *dst,
