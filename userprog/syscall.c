@@ -330,31 +330,50 @@ tid_t wait(tid_t pid)
 }
 
 // 휘건 추가
+// void *mmap(void *addr, size_t length, int writable, int fd, off_t offset)
+// {
+// 	if (!addr || addr != pg_round_down(addr))
+// 		return NULL;
+
+// 	if (offset != pg_round_down(offset))
+// 		return NULL;
+
+// 	if (!is_user_vaddr(addr) || !is_user_vaddr(addr + length))
+// 		return NULL;
+// 	// printf("\n\nhelli1\n\n");
+// 	if (spt_find_page(&thread_current()->spt, addr))
+// 		return NULL;
+// 	// printf("\n\nhelli2\n\n");
+
+// 	struct file *f = thread_current()->descriptors[fd];
+// 	if (f == NULL)
+// 		return NULL;
+// 	// printf("\n\nhelli3\n\n");
+
+// 	if ((int)length <= 0)
+// 		return NULL;
+// 	// printf("\n\nhelli4\n\n");
+// 	return do_mmap(addr, length, writable, f, offset); // 파일이 매핑된 가상 주소 반환
+// }
+
 void *mmap(void *addr, size_t length, int writable, int fd, off_t offset)
 {
-	if (!addr || addr != pg_round_down(addr))
+	if (!isFileOpened(fd) || !is_user_vaddr(addr) || !is_user_vaddr(addr + length) || pg_ofs(addr) != 0 || length <= 0 || addr == NULL || pg_ofs(offset) != 0)
 		return NULL;
 
-	if (offset != pg_round_down(offset))
+	//	handling overflow
+	if (addr + length < length)
 		return NULL;
 
-	if (!is_user_vaddr(addr) || !is_user_vaddr(addr + length))
-		return NULL;
-	// printf("\n\nhelli1\n\n");
-	if (spt_find_page(&thread_current()->spt, addr))
-		return NULL;
-	// printf("\n\nhelli2\n\n");
+	struct file *target = thread_current()->descriptors[fd];
 
-	struct file *f = thread_current()->descriptors[fd];
-	if (f == NULL)
+	if (file_length(target) == 0 || offset >= file_length(target))
 		return NULL;
-	// printf("\n\nhelli3\n\n");
 
-	if ((int)length <= 0)
-		return NULL;
-	// printf("\n\nhelli4\n\n");
-	return do_mmap(addr, length, writable, f, offset); // 파일이 매핑된 가상 주소 반환
+	return do_mmap(addr, length, writable, target, offset);
 }
+
+
 
 /* The main system call interface */
 void syscall_handler(struct intr_frame *f UNUSED)
